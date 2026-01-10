@@ -4,7 +4,7 @@ import os
 
 
 class UserRatingsManager:
-    """Gestionnaire de base de données pour les ratings utilisateurs"""
+    """Database manager for user ratings"""
     
     def __init__(self, db_path="user_ratings.db", movies_csv_path="ml-32m/movies.csv"):
         self.db_path = db_path
@@ -14,11 +14,11 @@ class UserRatingsManager:
         self.load_movies_mapping()
     
     def init_database(self):
-        """Initialise la base de données SQLite"""
+        """Initialize the SQLite database"""
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         cursor = self.conn.cursor()
         
-        # Table des utilisateurs
+        # Users table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,7 +27,7 @@ class UserRatingsManager:
             )
         ''')
         
-        # Table des ratings
+        # Ratings table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_ratings (
                 rating_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,7 +41,7 @@ class UserRatingsManager:
             )
         ''')
         
-        # Table des films aimés (likes)
+        # Liked movies table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_likes (
                 like_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +53,7 @@ class UserRatingsManager:
             )
         ''')
         
-        # Table de la liste personnelle
+        # Watchlist table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_watchlist (
                 watchlist_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,21 +65,20 @@ class UserRatingsManager:
             )
         ''')
         
-        # Index pour améliorer les performances
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_ratings ON user_ratings(user_id, movie_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_likes ON user_likes(user_id, movie_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_watchlist ON user_watchlist(user_id, movie_id)')
         
         self.conn.commit()
-        print("✓ Base de données initialisée")
+        print("✓ Database initialized")
     
     def load_movies_mapping(self):
-        """Charge le mapping movieId -> titre depuis movies.csv"""
+        """Load movieId -> title mapping from movies.csv"""
         self.movieid_to_title = {}
         self.title_to_movieid = {}
         
         if not os.path.exists(self.movies_csv_path):
-            print(f"⚠️ Fichier {self.movies_csv_path} non trouvé")
+            print(f"⚠️ File {self.movies_csv_path} not found")
             return
         
         with open(self.movies_csv_path, mode="r", newline="", encoding="utf-8") as f:
@@ -91,30 +90,26 @@ class UserRatingsManager:
                 self.movieid_to_title[movie_id] = title
                 self.title_to_movieid[title] = movie_id
         
-        print(f"✓ {len(self.movieid_to_title)} films chargés dans le mapping")
+        print(f"✓ {len(self.movieid_to_title)} movies loaded into the mapping")
     
-    # ============================================================================
-    # GESTION DES UTILISATEURS
-    # ============================================================================
     
     def create_user(self, username="default_user"):
-        """Crée un nouvel utilisateur"""
+        """Create a new user"""
         cursor = self.conn.cursor()
         try:
             cursor.execute('INSERT INTO users (username) VALUES (?)', (username,))
             self.conn.commit()
             user_id = cursor.lastrowid
-            print(f"✓ Utilisateur '{username}' créé avec ID: {user_id}")
+            print(f"✓ User '{username}' created with ID: {user_id}")
             return user_id
         except sqlite3.IntegrityError:
-            # L'utilisateur existe déjà
             cursor.execute('SELECT user_id FROM users WHERE username = ?', (username,))
             user_id = cursor.fetchone()[0]
-            print(f"✓ Utilisateur '{username}' déjà existant avec ID: {user_id}")
+            print(f"✓ User '{username}' already exists with ID: {user_id}")
             return user_id
     
     def get_user_id(self, username="default_user"):
-        """Récupère l'ID d'un utilisateur ou le crée s'il n'existe pas"""
+        """Get a user's ID or create the user if it does not exist"""
         cursor = self.conn.cursor()
         cursor.execute('SELECT user_id FROM users WHERE username = ?', (username,))
         result = cursor.fetchone()
@@ -124,12 +119,9 @@ class UserRatingsManager:
         else:
             return self.create_user(username)
     
-    # ============================================================================
-    # GESTION DES RATINGS
-    # ============================================================================
     
     def add_rating(self, movie_id, rating, username="default_user"):
-        """Ajoute ou met à jour un rating"""
+        """Add or update a rating"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -143,14 +135,14 @@ class UserRatingsManager:
             self.conn.commit()
             
             movie_title = self.movieid_to_title.get(movie_id, f"Movie {movie_id}")
-            print(f"✓ Rating {rating}/5 ajouté pour '{movie_title}'")
+            print(f"✓ Rating {rating}/5 added for '{movie_title}'")
             return True
         except Exception as e:
-            print(f"❌ Erreur lors de l'ajout du rating: {e}")
+            print(f"❌ Error while adding rating: {e}")
             return False
     
     def get_user_ratings(self, username="default_user"):
-        """Récupère tous les ratings d'un utilisateur"""
+        """Retrieve all ratings from a user"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -165,13 +157,13 @@ class UserRatingsManager:
         return [(r[0], r[1], r[2], r[3]) for r in ratings]
     
     def get_user_ratings_for_recommendation(self, username="default_user"):
-        """Récupère les ratings sous forme de liste pour le modèle de recommandation"""
+        """Retrieve ratings as a list for the recommendation model"""
         ratings = self.get_user_ratings(username)
         # Format: [(movie_id, rating), ...]
         return [(movie_id, rating) for movie_id, rating, _, _ in ratings]
     
     def delete_rating(self, movie_id, username="default_user"):
-        """Supprime un rating"""
+        """Delete a rating"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -182,15 +174,15 @@ class UserRatingsManager:
         self.conn.commit()
         
         movie_title = self.movieid_to_title.get(movie_id, f"Movie {movie_id}")
-        print(f"✓ Rating supprimé pour '{movie_title}'")
+        print(f"✓ Rating deleted for '{movie_title}'")
         return True
     
     # ============================================================================
-    # GESTION DES LIKES
+    # LIKES MANAGEMENT
     # ============================================================================
     
     def add_like(self, movie_id, username="default_user"):
-        """Ajoute un like à un film"""
+        """Add a like to a movie"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -202,14 +194,14 @@ class UserRatingsManager:
             self.conn.commit()
             
             movie_title = self.movieid_to_title.get(movie_id, f"Movie {movie_id}")
-            print(f"✓ Like ajouté pour '{movie_title}'")
+            print(f"✓ Like added for '{movie_title}'")
             return True
         except sqlite3.IntegrityError:
-            print("⚠️ Film déjà liké")
+            print("⚠️ Movie already liked")
             return False
     
     def remove_like(self, movie_id, username="default_user"):
-        """Retire un like"""
+        """Remove a like"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -220,11 +212,11 @@ class UserRatingsManager:
         self.conn.commit()
         
         movie_title = self.movieid_to_title.get(movie_id, f"Movie {movie_id}")
-        print(f"✓ Like retiré pour '{movie_title}'")
+        print(f"✓ Like removed for '{movie_title}'")
         return True
     
     def get_user_likes(self, username="default_user"):
-        """Récupère tous les films likés par un utilisateur"""
+        """Retrieve all liked movies for a user"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -239,7 +231,7 @@ class UserRatingsManager:
         return [like[0] for like in likes]
     
     def is_liked(self, movie_id, username="default_user"):
-        """Vérifie si un film est liké"""
+        """Check if a movie is liked"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -251,11 +243,11 @@ class UserRatingsManager:
         return cursor.fetchone()[0] > 0
     
     # ============================================================================
-    # GESTION DE LA WATCHLIST
+    # WATCHLIST MANAGEMENT
     # ============================================================================
     
     def add_to_watchlist(self, movie_id, username="default_user"):
-        """Ajoute un film à la liste"""
+        """Add a movie to the watchlist"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -267,14 +259,14 @@ class UserRatingsManager:
             self.conn.commit()
             
             movie_title = self.movieid_to_title.get(movie_id, f"Movie {movie_id}")
-            print(f"✓ Film ajouté à la liste: '{movie_title}'")
+            print(f"✓ Movie added to watchlist: '{movie_title}'")
             return True
         except sqlite3.IntegrityError:
-            print("⚠️ Film déjà dans la liste")
+            print("⚠️ Movie already in watchlist")
             return False
     
     def remove_from_watchlist(self, movie_id, username="default_user"):
-        """Retire un film de la liste"""
+        """Remove a movie from the watchlist"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -285,11 +277,11 @@ class UserRatingsManager:
         self.conn.commit()
         
         movie_title = self.movieid_to_title.get(movie_id, f"Movie {movie_id}")
-        print(f"✓ Film retiré de la liste: '{movie_title}'")
+        print(f"✓ Movie removed from watchlist: '{movie_title}'")
         return True
     
     def get_user_watchlist(self, username="default_user"):
-        """Récupère la liste des films d'un utilisateur"""
+        """Retrieve a user's watchlist"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -304,7 +296,7 @@ class UserRatingsManager:
         return [item[0] for item in watchlist]
     
     def is_in_watchlist(self, movie_id, username="default_user"):
-        """Vérifie si un film est dans la liste"""
+        """Check if a movie is in the watchlist"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
@@ -316,27 +308,27 @@ class UserRatingsManager:
         return cursor.fetchone()[0] > 0
     
     # ============================================================================
-    # STATISTIQUES ET UTILITAIRES
+    # STATISTICS AND UTILITIES
     # ============================================================================
     
     def get_user_stats(self, username="default_user"):
-        """Récupère les statistiques d'un utilisateur"""
+        """Retrieve user statistics"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
-        # Nombre de ratings
+        # Number of ratings
         cursor.execute('SELECT COUNT(*) FROM user_ratings WHERE user_id = ?', (user_id,))
         num_ratings = cursor.fetchone()[0]
         
-        # Nombre de likes
+        # Number of likes
         cursor.execute('SELECT COUNT(*) FROM user_likes WHERE user_id = ?', (user_id,))
         num_likes = cursor.fetchone()[0]
         
-        # Nombre de films dans la watchlist
+        # Number of movies in watchlist
         cursor.execute('SELECT COUNT(*) FROM user_watchlist WHERE user_id = ?', (user_id,))
         num_watchlist = cursor.fetchone()[0]
         
-        # Rating moyen
+        # Average rating
         cursor.execute('SELECT AVG(rating) FROM user_ratings WHERE user_id = ?', (user_id,))
         avg_rating = cursor.fetchone()[0] or 0
         
@@ -348,11 +340,11 @@ class UserRatingsManager:
         }
     
     def get_recent_activity(self, username="default_user", limit=10):
-        """Récupère l'activité récente d'un utilisateur"""
+        """Retrieve recent user activity"""
         user_id = self.get_user_id(username)
         cursor = self.conn.cursor()
         
-        # Combiner les activités récentes
+        # Combine recent activities
         cursor.execute('''
             SELECT 'rating' as type, movie_id, rating as value, updated_at as timestamp
             FROM user_ratings
@@ -386,19 +378,19 @@ class UserRatingsManager:
         return result
     
     def clear_database(self):
-        """Supprime toutes les données et les tables de la base"""
+        """Delete all data and tables from the database"""
         cursor = self.conn.cursor()
         cursor.execute("DROP TABLE IF EXISTS user_ratings")
         cursor.execute("DROP TABLE IF EXISTS user_likes")
         cursor.execute("DROP TABLE IF EXISTS user_watchlist")
         cursor.execute("DROP TABLE IF EXISTS users")
         self.conn.commit()
-        print("✓ Base de données vidée")
-        # Réinitialiser la DB pour pouvoir réutiliser les tables
+        print("✓ Database cleared")
+        # Reinitialize the DB to reuse tables
         self.init_database()
     
     def export_user_ratings_csv(self, username="default_user", output_path="my_ratings.csv"):
-        """Exporte les ratings d'un utilisateur en CSV"""
+        """Export user ratings to a CSV file"""
         ratings = self.get_user_ratings(username)
         
         with open(output_path, 'w', newline='', encoding='utf-8') as f:
@@ -409,62 +401,59 @@ class UserRatingsManager:
                 title = self.movieid_to_title.get(movie_id, f"Movie {movie_id}")
                 writer.writerow([movie_id, title, rating, created_at, updated_at])
         
-        print(f"✓ Ratings exportés vers {output_path}")
+        print(f"✓ Ratings exported to {output_path}")
         return output_path
     
     def close(self):
-        """Ferme la connexion à la base de données"""
+        """Close the database connection"""
         if self.conn:
             self.conn.close()
-            print("✓ Connexion à la base de données fermée")
+            print("✓ Database connection closed")
 
 
 # ============================================================================
-# EXEMPLE D'UTILISATION
+# USAGE EXAMPLE
 # ============================================================================
 
 if __name__ == "__main__":
-    # Initialiser le gestionnaire
+    # Initialize manager
     manager = UserRatingsManager()
     
-    # Créer un utilisateur
+    # Create a user
     user_id = manager.create_user("john_doe")
     
-    # Ajouter des ratings
+    # Add ratings
     manager.add_rating(movie_id=1, rating=5.0, username="john_doe")
     manager.add_rating(movie_id=2, rating=4.5, username="john_doe")
     manager.add_rating(movie_id=3, rating=3.5, username="john_doe")
     
-    # Ajouter des likes
+    # Add likes
     manager.add_like(movie_id=1, username="john_doe")
     manager.add_like(movie_id=5, username="john_doe")
     
-    # Ajouter à la watchlist
+    # Add to watchlist
     manager.add_to_watchlist(movie_id=10, username="john_doe")
     manager.add_to_watchlist(movie_id=15, username="john_doe")
     
-    # Récupérer les ratings
+    # Retrieve ratings
     ratings = manager.get_user_ratings("john_doe")
-    print(f"\n📊 Ratings de john_doe: {len(ratings)}")
+    print(f"\n📊 Ratings for john_doe: {len(ratings)}")
     for movie_id, rating, created, updated in ratings:
         print(f"  - Movie {movie_id}: {rating}/5")
     
-    # Récupérer les stats
+    # Retrieve stats
     stats = manager.get_user_stats("john_doe")
-    print("\n📈 Statistiques:")
     print(f"  - Ratings: {stats['num_ratings']}")
     print(f"  - Likes: {stats['num_likes']}")
     print(f"  - Watchlist: {stats['num_watchlist']}")
-    print(f"  - Rating moyen: {stats['avg_rating']}/5")
+    print(f"  - Average rating: {stats['avg_rating']}/5")
     
-    # Activité récente
+    # Recent activity
     activities = manager.get_recent_activity("john_doe", limit=5)
-    print("\n🕒 Activité récente:")
     for activity in activities:
         print(f"  - {activity['type']}: {activity['movie_title']} ({activity['timestamp']})")
     
-    # Exporter les ratings
+    # Export ratings
     manager.export_user_ratings_csv("john_doe")
     manager.clear_database()
-    # Fermer la connexion
     manager.close()

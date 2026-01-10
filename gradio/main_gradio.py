@@ -261,7 +261,7 @@ def get_recommendations_for_user(username=CURRENT_USER, top_n=18):
     
     dummy_user_factors, dummy_user_bias = compute_dummy_user(
         item_factors, item_biases, dummy_ratings, 
-        K=10, lambda_val=0.06, tau=1.5, gamma_bias=0.06
+        K=15, lambda_val=0.1, tau=1.9, gamma_bias=0.04
     )
     
     num_items = item_factors.shape[0]
@@ -720,7 +720,7 @@ button[size="sm"]:hover {
 }
 """
 
-with gr.Blocks(title="🎬 MOVIEFLIX", theme=gr.themes.Soft(), css=custom_css) as app:
+with gr.Blocks(title="🎬 MOVIEFLIX", theme=gr.themes.Soft(), css=custom_css) as app_scale:
     
     gr.Markdown("""
     <div style="
@@ -1128,4 +1128,4 @@ if __name__ == "__main__":
     print("\n" + "="*60)
     print("🚀 LAUNCHING MOVIEFLIX APPLICATION")
     print("="*60)
-    app.launch(share=False, server_name="0.0.0.0", server_port=7861, show_error=True)
+    app_scale.launch(share=False, server_name="0.0.0.0", server_port=7861, show_error=True)
